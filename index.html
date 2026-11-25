@@ -1,0 +1,1264 @@
+<!DOCTYPE html>
+<html lang="id" data-theme="light">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Gealink — Shortlink Dashboard</title>
+<script src="https://cdn.jsdelivr.net/npm/qrcodejs@1.0.0/qrcode.min.js"></script>
+<style>
+  /* ============ DESIGN TOKENS ============ */
+  :root {
+    --font: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    --radius-sm: 8px;
+    --radius: 12px;
+    --radius-lg: 16px;
+    --radius-full: 999px;
+    --shadow-sm: 0 1px 2px rgba(16,24,40,0.05);
+    --shadow: 0 4px 12px rgba(16,24,40,0.08);
+    --shadow-lg: 0 12px 32px rgba(16,24,40,0.12);
+    --transition: 180ms cubic-bezier(0.4, 0, 0.2, 1);
+  }
+
+  /* Light theme (default) */
+  [data-theme="light"] {
+    --bg: #f7f8fa;
+    --bg-elevated: #ffffff;
+    --bg-subtle: #f0f2f5;
+    --bg-hover: #f5f6f8;
+    --border: #e4e7ec;
+    --border-strong: #d0d5dd;
+    --text: #101828;
+    --text-secondary: #475467;
+    --text-tertiary: #98a2b3;
+    --primary: #4f46e5;
+    --primary-hover: #4338ca;
+    --primary-soft: #eef2ff;
+    --success: #12b76a;
+    --success-soft: #ecfdf3;
+    --danger: #f04438;
+    --danger-soft: #fef3f2;
+    --warning: #f79009;
+    --warning-soft: #fffaeb;
+    --info: #2e90fa;
+    --info-soft: #eff8ff;
+    --ring: rgba(79,70,229,0.2);
+    --sidebar-bg: #ffffff;
+  }
+
+  /* Dark theme */
+  [data-theme="dark"] {
+    --bg: #0b0f19;
+    --bg-elevated: #131a26;
+    --bg-subtle: #1a2233;
+    --bg-hover: #1e2739;
+    --border: #232d3f;
+    --border-strong: #344054;
+    --text: #f2f4f7;
+    --text-secondary: #98a2b3;
+    --text-tertiary: #667085;
+    --primary: #7c73f0;
+    --primary-hover: #8f87f5;
+    --primary-soft: #1e1b4b;
+    --success: #32d583;
+    --success-soft: #0d2b1f;
+    --danger: #f97066;
+    --danger-soft: #2b1310;
+    --warning: #fdb022;
+    --warning-soft: #2b1f08;
+    --info: #53b1fd;
+    --info-soft: #0a2540;
+    --ring: rgba(124,115,240,0.3);
+    --sidebar-bg: #0f1520;
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  html { scroll-behavior: smooth; }
+  body {
+    font-family: var(--font);
+    background: var(--bg);
+    color: var(--text);
+    font-size: 14px;
+    line-height: 1.5;
+    -webkit-font-smoothing: antialiased;
+    transition: background var(--transition), color var(--transition);
+    min-height: 100vh;
+  }
+  button, input, select, textarea { font-family: inherit; font-size: inherit; }
+  button { cursor: pointer; border: none; background: none; color: inherit; }
+  a { color: var(--primary); text-decoration: none; }
+  a:hover { text-decoration: underline; }
+  ::selection { background: var(--primary-soft); color: var(--primary); }
+
+  /* Scrollbar */
+  ::-webkit-scrollbar { width: 10px; height: 10px; }
+  ::-webkit-scrollbar-track { background: transparent; }
+  ::-webkit-scrollbar-thumb { background: var(--border-strong); border-radius: var(--radius-full); border: 2px solid var(--bg); }
+  ::-webkit-scrollbar-thumb:hover { background: var(--text-tertiary); }
+
+  /* ============ APP SHELL ============ */
+  .app {
+    display: grid;
+    grid-template-columns: 260px 1fr;
+    min-height: 100vh;
+  }
+
+  /* Sidebar */
+  .sidebar {
+    background: var(--sidebar-bg);
+    border-right: 1px solid var(--border);
+    padding: 20px 16px;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    position: sticky;
+    top: 0;
+    height: 100vh;
+    overflow-y: auto;
+    transition: background var(--transition), border-color var(--transition);
+  }
+  .brand {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 8px 10px 20px;
+  }
+  .brand-logo {
+    width: 36px; height: 36px;
+    border-radius: 10px;
+    background: linear-gradient(135deg, var(--primary), #8b5cf6);
+    display: grid; place-items: center;
+    color: #fff;
+    font-weight: 800;
+    font-size: 16px;
+    box-shadow: 0 4px 12px var(--ring);
+  }
+  .brand-name { font-weight: 800; font-size: 18px; letter-spacing: -0.3px; }
+  .brand-sub { font-size: 11px; color: var(--text-tertiary); font-weight: 500; }
+
+  .nav-section { margin-top: 8px; }
+  .nav-label {
+    font-size: 11px; font-weight: 700; color: var(--text-tertiary);
+    text-transform: uppercase; letter-spacing: 0.5px;
+    padding: 8px 10px 6px;
+  }
+  .nav-item {
+    display: flex; align-items: center; gap: 10px;
+    padding: 9px 10px;
+    border-radius: var(--radius-sm);
+    color: var(--text-secondary);
+    font-weight: 500;
+    font-size: 13px;
+    cursor: pointer;
+    transition: all var(--transition);
+    width: 100%;
+    text-align: left;
+  }
+  .nav-item:hover { background: var(--bg-hover); color: var(--text); }
+  .nav-item.active { background: var(--primary-soft); color: var(--primary); font-weight: 600; }
+  .nav-item .icon { width: 18px; height: 18px; flex-shrink: 0; }
+  .nav-badge {
+    margin-left: auto; font-size: 10px; font-weight: 700;
+    background: var(--bg-subtle); color: var(--text-secondary);
+    padding: 2px 7px; border-radius: var(--radius-full);
+  }
+  .nav-item.active .nav-badge { background: var(--primary); color: #fff; }
+
+  .sidebar-footer {
+    margin-top: auto;
+    padding-top: 16px;
+    border-top: 1px solid var(--border);
+  }
+  .plan-card {
+    background: linear-gradient(135deg, var(--primary), #8b5cf6);
+    border-radius: var(--radius);
+    padding: 14px;
+    color: #fff;
+    font-size: 12px;
+  }
+  .plan-card .plan-title { font-weight: 700; font-size: 13px; margin-bottom: 2px; }
+  .plan-card .plan-desc { opacity: 0.85; font-size: 11px; }
+
+  /* Main area */
+  .main {
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
+  }
+
+  /* Topbar */
+  .topbar {
+    display: flex; align-items: center; gap: 16px;
+    padding: 16px 28px;
+    border-bottom: 1px solid var(--border);
+    background: var(--bg-elevated);
+    position: sticky; top: 0; z-index: 50;
+    transition: background var(--transition), border-color var(--transition);
+  }
+  .search-box {
+    flex: 1; max-width: 420px;
+    position: relative;
+  }
+  .search-box svg {
+    position: absolute; left: 12px; top: 50%; transform: translateY(-50%);
+    width: 16px; height: 16px; color: var(--text-tertiary);
+    pointer-events: none;
+  }
+  .search-box input {
+    width: 100%; padding: 9px 12px 9px 36px;
+    background: var(--bg-subtle);
+    border: 1px solid transparent;
+    border-radius: var(--radius-sm);
+    color: var(--text);
+    transition: all var(--transition);
+  }
+  .search-box input:focus {
+    outline: none;
+    background: var(--bg-elevated);
+    border-color: var(--primary);
+    box-shadow: 0 0 0 3px var(--ring);
+  }
+  .topbar-actions { display: flex; align-items: center; gap: 8px; margin-left: auto; }
+
+  .icon-btn {
+    width: 38px; height: 38px;
+    border-radius: var(--radius-sm);
+    display: grid; place-items: center;
+    color: var(--text-secondary);
+    transition: all var(--transition);
+    border: 1px solid transparent;
+  }
+  .icon-btn:hover { background: var(--bg-hover); color: var(--text); }
+  .icon-btn:focus-visible { outline: none; box-shadow: 0 0 0 3px var(--ring); }
+  .icon-btn svg { width: 18px; height: 18px; }
+
+  .theme-toggle {
+    position: relative;
+    overflow: hidden;
+  }
+  .theme-toggle .sun, .theme-toggle .moon {
+    position: absolute;
+    transition: transform 400ms cubic-bezier(0.4, 0, 0.2, 1), opacity 300ms;
+  }
+  .theme-toggle .moon { transform: translateY(20px) rotate(-90deg); opacity: 0; }
+  .theme-toggle .sun { transform: translateY(0) rotate(0); opacity: 1; }
+  [data-theme="dark"] .theme-toggle .moon { transform: translateY(0) rotate(0); opacity: 1; }
+  [data-theme="dark"] .theme-toggle .sun { transform: translateY(-20px) rotate(90deg); opacity: 0; }
+
+  /* Buttons */
+  .btn {
+    display: inline-flex; align-items: center; justify-content: center; gap: 6px;
+    padding: 9px 16px;
+    border-radius: var(--radius-sm);
+    font-weight: 600; font-size: 13px;
+    transition: all var(--transition);
+    white-space: nowrap;
+    border: 1px solid transparent;
+  }
+  .btn:focus-visible { outline: none; box-shadow: 0 0 0 3px var(--ring); }
+  .btn-primary {
+    background: var(--primary); color: #fff;
+    box-shadow: 0 1px 2px rgba(16,24,40,0.1);
+  }
+  .btn-primary:hover { background: var(--primary-hover); transform: translateY(-1px); box-shadow: var(--shadow); }
+  .btn-primary:active { transform: translateY(0); }
+  .btn-secondary {
+    background: var(--bg-elevated); color: var(--text);
+    border-color: var(--border-strong);
+  }
+  .btn-secondary:hover { background: var(--bg-hover); }
+  .btn-ghost { color: var(--text-secondary); }
+  .btn-ghost:hover { background: var(--bg-hover); color: var(--text); }
+  .btn-danger-ghost { color: var(--danger); }
+  .btn-danger-ghost:hover { background: var(--danger-soft); }
+  .btn-sm { padding: 6px 10px; font-size: 12px; }
+  .btn svg { width: 16px; height: 16px; }
+
+  /* Content */
+  .content {
+    padding: 28px;
+    max-width: 1400px;
+    width: 100%;
+  }
+  .page-header {
+    display: flex; align-items: flex-start; justify-content: space-between;
+    margin-bottom: 24px;
+    gap: 16px; flex-wrap: wrap;
+  }
+  .page-title { font-size: 24px; font-weight: 800; letter-spacing: -0.5px; }
+  .page-sub { color: var(--text-secondary); font-size: 13px; margin-top: 4px; }
+
+  /* Stats */
+  .stats-grid {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 16px;
+    margin-bottom: 24px;
+  }
+  .stat-card {
+    background: var(--bg-elevated);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 18px;
+    transition: all var(--transition);
+  }
+  .stat-card:hover { border-color: var(--border-strong); box-shadow: var(--shadow-sm); }
+  .stat-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px; }
+  .stat-label { font-size: 12px; color: var(--text-secondary); font-weight: 600; }
+  .stat-icon {
+    width: 32px; height: 32px;
+    border-radius: 8px;
+    display: grid; place-items: center;
+  }
+  .stat-icon svg { width: 16px; height: 16px; }
+  .stat-icon.blue { background: var(--info-soft); color: var(--info); }
+  .stat-icon.green { background: var(--success-soft); color: var(--success); }
+  .stat-icon.purple { background: var(--primary-soft); color: var(--primary); }
+  .stat-icon.orange { background: var(--warning-soft); color: var(--warning); }
+  .stat-value { font-size: 26px; font-weight: 800; letter-spacing: -0.5px; line-height: 1.1; }
+  .stat-trend { font-size: 11px; color: var(--text-tertiary); margin-top: 6px; display: flex; align-items: center; gap: 4px; }
+  .stat-trend.up { color: var(--success); }
+  .stat-trend.down { color: var(--danger); }
+
+  /* Card */
+  .card {
+    background: var(--bg-elevated);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    transition: background var(--transition), border-color var(--transition);
+  }
+  .card-header {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 18px 20px;
+    border-bottom: 1px solid var(--border);
+    gap: 12px; flex-wrap: wrap;
+  }
+  .card-title { font-size: 15px; font-weight: 700; }
+  .card-body { padding: 20px; }
+
+  /* Create form */
+  .create-form { margin-bottom: 24px; }
+  .form-grid {
+    display: grid;
+    grid-template-columns: 2fr 1fr;
+    gap: 14px;
+  }
+  .field { display: flex; flex-direction: column; gap: 6px; }
+  .field label {
+    font-size: 12px; font-weight: 600; color: var(--text-secondary);
+  }
+  .field .hint { font-size: 11px; color: var(--text-tertiary); font-weight: 400; }
+  .input-wrap { display: flex; align-items: stretch; }
+  .input-prefix {
+    padding: 0 12px;
+    background: var(--bg-subtle);
+    border: 1px solid var(--border);
+    border-right: none;
+    border-radius: var(--radius-sm) 0 0 var(--radius-sm);
+    display: flex; align-items: center;
+    font-size: 13px; color: var(--text-secondary);
+    white-space: nowrap;
+    font-family: 'SF Mono', Monaco, monospace;
+  }
+  .input-wrap input, .input-wrap select {
+    border-radius: 0 var(--radius-sm) var(--radius-sm) 0;
+  }
+  .input-wrap input:only-child, .input-wrap select:only-child { border-radius: var(--radius-sm); }
+  input, select, textarea {
+    padding: 9px 12px;
+    background: var(--bg-elevated);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    color: var(--text);
+    outline: none;
+    transition: all var(--transition);
+    width: 100%;
+  }
+  input::placeholder { color: var(--text-tertiary); }
+  input:focus, select:focus, textarea:focus {
+    border-color: var(--primary);
+    box-shadow: 0 0 0 3px var(--ring);
+  }
+  input.invalid { border-color: var(--danger); }
+  input.invalid:focus { box-shadow: 0 0 0 3px rgba(240,68,56,0.15); }
+
+  .live-preview {
+    margin-top: 14px;
+    padding: 12px 14px;
+    background: var(--bg-subtle);
+    border-radius: var(--radius-sm);
+    font-size: 13px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    color: var(--text-secondary);
+    transition: all var(--transition);
+  }
+  .live-preview .preview-url {
+    font-family: 'SF Mono', Monaco, monospace;
+    color: var(--primary);
+    font-weight: 600;
+  }
+  .live-preview .preview-meta { margin-left: auto; font-size: 11px; }
+
+  .form-actions {
+    display: flex; gap: 10px; margin-top: 16px;
+    justify-content: flex-end;
+  }
+
+  /* Filters */
+  .filters {
+    display: flex; gap: 8px; align-items: center; flex-wrap: wrap;
+  }
+  .filter-btn {
+    padding: 6px 12px;
+    border-radius: var(--radius-full);
+    font-size: 12px; font-weight: 600;
+    background: var(--bg-subtle);
+    color: var(--text-secondary);
+    border: 1px solid transparent;
+    transition: all var(--transition);
+  }
+  .filter-btn:hover { background: var(--bg-hover); }
+  .filter-btn.active {
+    background: var(--primary-soft);
+    color: var(--primary);
+    border-color: var(--primary);
+  }
+
+  /* Table */
+  .table-wrap { overflow-x: auto; }
+  table { width: 100%; border-collapse: collapse; }
+  thead th {
+    text-align: left;
+    padding: 10px 16px;
+    font-size: 11px; font-weight: 700;
+    color: var(--text-tertiary);
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    border-bottom: 1px solid var(--border);
+    background: var(--bg-subtle);
+    white-space: nowrap;
+    cursor: pointer;
+    user-select: none;
+    transition: background var(--transition);
+  }
+  thead th:hover { background: var(--bg-hover); }
+  thead th .sort-icon { display: inline-block; margin-left: 4px; opacity: 0.4; font-size: 9px; }
+  thead th.sorted .sort-icon { opacity: 1; color: var(--primary); }
+  tbody td {
+    padding: 14px 16px;
+    border-bottom: 1px solid var(--border);
+    vertical-align: middle;
+    font-size: 13px;
+  }
+  tbody tr { transition: background var(--transition); }
+  tbody tr:hover { background: var(--bg-hover); cursor: pointer; }
+  tbody tr:last-child td { border-bottom: none; }
+
+  .link-cell { display: flex; flex-direction: column; gap: 3px; }
+  .link-slug {
+    font-family: 'SF Mono', Monaco, monospace;
+    font-weight: 600;
+    color: var(--primary);
+    font-size: 13px;
+  }
+  .link-note { font-size: 11px; color: var(--text-tertiary); }
+  .link-target {
+    color: var(--text-secondary);
+    max-width: 320px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    display: block;
+    font-size: 12px;
+  }
+
+  .chip {
+    display: inline-flex; align-items: center; gap: 4px;
+    font-size: 11px; font-weight: 600;
+    padding: 3px 8px;
+    border-radius: var(--radius-full);
+    white-space: nowrap;
+  }
+  .chip::before {
+    content: ''; width: 6px; height: 6px; border-radius: 50%;
+    background: currentColor;
+  }
+  .chip-success { background: var(--success-soft); color: var(--success); }
+  .chip-danger { background: var(--danger-soft); color: var(--danger); }
+  .chip-warning { background: var(--warning-soft); color: var(--warning); }
+  .chip-info { background: var(--info-soft); color: var(--info); }
+  .chip-neutral { background: var(--bg-subtle); color: var(--text-secondary); }
+
+  .clicks-cell {
+    display: flex; align-items: center; gap: 10px;
+  }
+  .clicks-num { font-weight: 700; font-size: 14px; min-width: 40px; }
+  .sparkline { width: 60px; height: 20px; }
+
+  .row-actions {
+    display: flex; gap: 4px; justify-content: flex-end;
+  }
+
+  .empty-state {
+    text-align: center;
+    padding: 60px 20px;
+    color: var(--text-tertiary);
+  }
+  .empty-state svg { width: 48px; height: 48px; margin-bottom: 12px; opacity: 0.5; }
+  .empty-state h3 { font-size: 15px; font-weight: 700; color: var(--text); margin-bottom: 4px; }
+  .empty-state p { font-size: 13px; }
+
+  /* Drawer */
+  .drawer-overlay {
+    position: fixed; inset: 0;
+    background: rgba(16,24,40,0.5);
+    backdrop-filter: blur(2px);
+    opacity: 0; visibility: hidden;
+    transition: all var(--transition);
+    z-index: 200;
+  }
+  .drawer-overlay.show { opacity: 1; visibility: visible; }
+  .drawer {
+    position: fixed;
+    top: 0; right: 0; bottom: 0;
+    width: 440px; max-width: 100%;
+    background: var(--bg-elevated);
+    border-left: 1px solid var(--border);
+    transform: translateX(100%);
+    transition: transform 300ms cubic-bezier(0.4, 0, 0.2, 1);
+    z-index: 201;
+    display: flex; flex-direction: column;
+    overflow-y: auto;
+  }
+  .drawer.show { transform: translateX(0); }
+  .drawer-header {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 20px 24px;
+    border-bottom: 1px solid var(--border);
+    position: sticky; top: 0;
+    background: var(--bg-elevated);
+    z-index: 1;
+  }
+  .drawer-title { font-size: 16px; font-weight: 700; }
+  .drawer-body { padding: 24px; display: flex; flex-direction: column; gap: 20px; }
+
+  .detail-group { display: flex; flex-direction: column; gap: 8px; }
+  .detail-label { font-size: 11px; font-weight: 700; color: var(--text-tertiary); text-transform: uppercase; letter-spacing: 0.5px; }
+  .detail-value {
+    font-size: 13px; word-break: break-all;
+    padding: 10px 12px;
+    background: var(--bg-subtle);
+    border-radius: var(--radius-sm);
+    font-family: 'SF Mono', Monaco, monospace;
+  }
+  .detail-value.plain { font-family: var(--font); }
+
+  .qr-container {
+    display: flex; flex-direction: column; align-items: center; gap: 12px;
+    padding: 20px;
+    background: var(--bg-subtle);
+    border-radius: var(--radius);
+  }
+  #qrcode { padding: 12px; background: #fff; border-radius: var(--radius-sm); }
+
+  .mini-chart { width: 100%; height: 120px; }
+
+  /* Toast */
+  .toast-container {
+    position: fixed; bottom: 24px; left: 50%; transform: translateX(-50%);
+    z-index: 300; display: flex; flex-direction: column; gap: 8px;
+    pointer-events: none;
+  }
+  .toast {
+    background: var(--bg-elevated);
+    color: var(--text);
+    padding: 12px 18px;
+    border-radius: var(--radius-sm);
+    border: 1px solid var(--border);
+    box-shadow: var(--shadow-lg);
+    font-weight: 600; font-size: 13px;
+    display: flex; align-items: center; gap: 8px;
+    transform: translateY(120%);
+    opacity: 0;
+    transition: all 300ms cubic-bezier(0.4, 0, 0.2, 1);
+    pointer-events: auto;
+  }
+  .toast.show { transform: translateY(0); opacity: 1; }
+  .toast.success { border-left: 3px solid var(--success); }
+  .toast.error { border-left: 3px solid var(--danger); }
+  .toast svg { width: 16px; height: 16px; flex-shrink: 0; }
+  .toast.success svg { color: var(--success); }
+  .toast.error svg { color: var(--danger); }
+
+  /* Mobile */
+  .mobile-menu-btn { display: none; }
+  @media (max-width: 900px) {
+    .app { grid-template-columns: 1fr; }
+    .sidebar {
+      position: fixed; left: 0; top: 0; bottom: 0; width: 260px;
+      z-index: 150;
+      transform: translateX(-100%);
+      transition: transform 300ms cubic-bezier(0.4, 0, 0.2, 1);
+      box-shadow: var(--shadow-lg);
+    }
+    .sidebar.open { transform: translateX(0); }
+    .mobile-menu-btn { display: grid; }
+    .stats-grid { grid-template-columns: repeat(2, 1fr); }
+    .form-grid { grid-template-columns: 1fr; }
+    .topbar { padding: 12px 16px; }
+    .content { padding: 16px; }
+    .page-header { flex-direction: column; align-items: stretch; }
+    .drawer { width: 100%; }
+  }
+  @media (max-width: 500px) {
+    .stats-grid { grid-template-columns: 1fr; }
+  }
+
+  /* Focus ring for keyboard nav */
+  :focus-visible { outline: 2px solid var(--primary); outline-offset: 2px; }
+</style>
+</head>
+<body>
+
+<div class="app">
+  <!-- Sidebar -->
+  <aside class="sidebar" id="sidebar">
+    <div class="brand">
+      <div class="brand-logo">G</div>
+      <div>
+        <div class="brand-name">Gealink</div>
+        <div class="brand-sub">gea.my.id</div>
+      </div>
+    </div>
+
+    <div class="nav-section">
+      <div class="nav-label">Menu</div>
+      <button class="nav-item active">
+        <svg class="icon" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6"/></svg>
+        Dashboard
+      </button>
+      <button class="nav-item">
+        <svg class="icon" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1"/></svg>
+        Semua Link
+        <span class="nav-badge" id="navCount">0</span>
+      </button>
+      <button class="nav-item">
+        <svg class="icon" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"/></svg>
+        Analitik
+      </button>
+      <button class="nav-item">
+        <svg class="icon" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"/><path stroke-linecap="round" stroke-linejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/></svg>
+        Pengaturan
+      </button>
+    </div>
+
+    <div class="nav-section">
+      <div class="nav-label">Lainnya</div>
+      <button class="nav-item">
+        <svg class="icon" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253"/></svg>
+        Dokumentasi API
+      </button>
+    </div>
+
+    <div class="sidebar-footer">
+      <div class="plan-card">
+        <div class="plan-title">✨ Free Plan</div>
+        <div class="plan-desc">Unlimited links • 1.000 klik/bulan</div>
+      </div>
+    </div>
+  </aside>
+
+  <!-- Main -->
+  <main class="main">
+    <header class="topbar">
+      <button class="icon-btn mobile-menu-btn" onclick="toggleSidebar()" aria-label="Menu">
+        <svg fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M4 6h16M4 12h16M4 18h16"/></svg>
+      </button>
+
+      <div class="search-box">
+        <svg fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/></svg>
+        <input id="searchInput" placeholder="Cari link, slug, atau catatan..." oninput="render()">
+      </div>
+
+      <div class="topbar-actions">
+        <button class="icon-btn theme-toggle" onclick="toggleTheme()" aria-label="Ganti tema" title="Ganti tema">
+          <svg class="sun" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z"/></svg>
+          <svg class="moon" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z"/></svg>
+        </button>
+        <button class="btn btn-secondary btn-sm" onclick="seedDemo()">
+          <svg fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12"/></svg>
+          Data Demo
+        </button>
+      </div>
+    </header>
+
+    <div class="content">
+      <!-- Page header -->
+      <div class="page-header">
+        <div>
+          <h1 class="page-title">Dashboard</h1>
+          <p class="page-sub">Kelola semua shortlink kamu di gea.my.id</p>
+        </div>
+        <button class="btn btn-primary" onclick="document.getElementById('inpUrl').focus()">
+          <svg fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M12 4v16m8-8H4"/></svg>
+          Buat Link Baru
+        </button>
+      </div>
+
+      <!-- Stats -->
+      <div class="stats-grid">
+        <div class="stat-card">
+          <div class="stat-head">
+            <span class="stat-label">Total Link</span>
+            <div class="stat-icon purple"><svg fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1"/></svg></div>
+          </div>
+          <div class="stat-value" id="statTotal">0</div>
+          <div class="stat-trend" id="statTotalTrend">—</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-head">
+            <span class="stat-label">Total Klik</span>
+            <div class="stat-icon blue"><svg fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M15 15l-2 5L9 9l11 4-5 2zm0 0l5 5M7.188 2.239l.777 2.897M5.136 7.965l-2.898-.777M13.95 4.05l-2.122 2.122m-5.657 5.656l-2.12 2.122"/></svg></div>
+          </div>
+          <div class="stat-value" id="statClicks">0</div>
+          <div class="stat-trend up" id="statClicksTrend">↑ 0% vs minggu lalu</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-head">
+            <span class="stat-label">Link Aktif</span>
+            <div class="stat-icon green"><svg fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/></svg></div>
+          </div>
+          <div class="stat-value" id="statActive">0</div>
+          <div class="stat-trend" id="statActiveTrend">—</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-head">
+            <span class="stat-label">Rata-rata Klik</span>
+            <div class="stat-icon orange"><svg fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"/></svg></div>
+          </div>
+          <div class="stat-value" id="statAvg">0</div>
+          <div class="stat-trend">per link</div>
+        </div>
+      </div>
+
+      <!-- Create form -->
+      <div class="card create-form">
+        <div class="card-header">
+          <span class="card-title">Buat Link Baru</span>
+          <span class="chip chip-info">⚡ Instan</span>
+        </div>
+        <div class="card-body">
+          <div class="form-grid">
+            <div class="field">
+              <label>URL Tujuan <span class="hint">wajib</span></label>
+              <input id="inpUrl" type="url" placeholder="https://contoh.com/halaman-panjang" oninput="updatePreview()">
+            </div>
+            <div class="field">
+              <label>Alias Kustom <span class="hint">opsional</span></label>
+              <div class="input-wrap">
+                <span class="input-prefix">gea.my.id/</span>
+                <input id="inpSlug" placeholder="promo-2025" pattern="[a-zA-Z0-9_-]+" oninput="updatePreview()">
+              </div>
+            </div>
+            <div class="field">
+              <label>Masa Berlaku</label>
+              <select id="inpExpiry">
+                <option value="0">♾️ Selamanya</option>
+                <option value="1">1 Hari</option>
+                <option value="7">7 Hari</option>
+                <option value="30">30 Hari</option>
+                <option value="90">90 Hari</option>
+              </select>
+            </div>
+            <div class="field">
+              <label>Password <span class="hint">opsional</span></label>
+              <input id="inpPass" type="text" placeholder="Kosongkan jika publik">
+            </div>
+            <div class="field" style="grid-column: 1/-1;">
+              <label>Catatan <span class="hint">opsional, untuk kamu sendiri</span></label>
+              <input id="inpNote" placeholder="mis. untuk kampanye Instagram Desember">
+            </div>
+          </div>
+
+          <div class="live-preview" id="livePreview" style="display:none;">
+            <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1"/></svg>
+            <span>Preview:</span>
+            <span class="preview-url" id="previewUrl">gea.my.id/</span>
+            <span class="preview-meta" id="previewMeta"></span>
+          </div>
+
+          <div class="form-actions">
+            <button class="btn btn-ghost" onclick="clearForm()">Reset</button>
+            <button class="btn btn-primary" onclick="createLink()">
+              <svg fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M12 4v16m8-8H4"/></svg>
+              Buat Link
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <!-- List -->
+      <div class="card">
+        <div class="card-header">
+          <span class="card-title">Daftar Link</span>
+          <div class="filters">
+            <button class="filter-btn active" data-filter="all" onclick="setFilter('all')">Semua</button>
+            <button class="filter-btn" data-filter="active" onclick="setFilter('active')">Aktif</button>
+            <button class="filter-btn" data-filter="expired" onclick="setFilter('expired')">Expired</button>
+            <button class="filter-btn" data-filter="protected" onclick="setFilter('protected')">🔒 Password</button>
+          </div>
+        </div>
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th onclick="setSort('slug')">Short Link <span class="sort-icon">▼</span></th>
+                <th onclick="setSort('url')">Target <span class="sort-icon">▼</span></th>
+                <th onclick="setSort('status')">Status <span class="sort-icon">▼</span></th>
+                <th onclick="setSort('clicks')">Klik <span class="sort-icon">▼</span></th>
+                <th onclick="setSort('createdAt')">Dibuat <span class="sort-icon">▼</span></th>
+                <th style="text-align:right;">Aksi</th>
+              </tr>
+            </thead>
+            <tbody id="linkTable"></tbody>
+          </table>
+        </div>
+        <div id="emptyState" class="empty-state" style="display:none;">
+          <svg fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1"/></svg>
+          <h3>Belum ada link</h3>
+          <p>Buat link pertama kamu di form di atas 👆</p>
+        </div>
+      </div>
+    </div>
+  </main>
+</div>
+
+<!-- Drawer -->
+<div class="drawer-overlay" id="drawerOverlay" onclick="closeDrawer()"></div>
+<aside class="drawer" id="drawer">
+  <div class="drawer-header">
+    <span class="drawer-title">Detail Link</span>
+    <button class="icon-btn" onclick="closeDrawer()" aria-label="Tutup">
+      <svg fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"/></svg>
+    </button>
+  </div>
+  <div class="drawer-body" id="drawerBody"></div>
+</aside>
+
+<!-- Toast -->
+<div class="toast-container" id="toastContainer"></div>
+
+<script>
+// ============ THEME ============
+const THEME_KEY = 'gealink_theme';
+function getInitialTheme() {
+  const saved = localStorage.getItem(THEME_KEY);
+  if (saved === 'light' || saved === 'dark') return saved;
+  return 'light'; // default light sesuai permintaan
+}
+function applyTheme(theme) {
+  document.documentElement.setAttribute('data-theme', theme);
+  localStorage.setItem(THEME_KEY, theme);
+}
+function toggleTheme() {
+  const current = document.documentElement.getAttribute('data-theme');
+  applyTheme(current === 'dark' ? 'light' : 'dark');
+}
+applyTheme(getInitialTheme());
+
+// ============ STATE ============
+const DB_KEY = 'gealink_links_v2';
+let links = JSON.parse(localStorage.getItem(DB_KEY) || '[]');
+let filter = 'all';
+let sortKey = 'createdAt';
+let sortDir = 'desc';
+let currentDrawerId = null;
+
+function save() { localStorage.setItem(DB_KEY, JSON.stringify(links)); }
+
+// ============ HELPERS ============
+function genSlug(len = 6) {
+  const chars = 'abcdefghijkmnpqrstuvwxyzABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+  let s = '';
+  for (let i = 0; i < len; i++) s += chars[Math.floor(Math.random() * chars.length)];
+  return s;
+}
+function isValidUrl(str) {
+  try { const u = new URL(str); return u.protocol === 'http:' || u.protocol === 'https:'; }
+  catch { return false; }
+}
+function fmtDate(ts) {
+  return new Date(ts).toLocaleDateString('id-ID', { day: '2-digit', month: 'short', year: 'numeric' });
+}
+function escapeHtml(s) {
+  return String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+}
+function toast(msg, type = 'success') {
+  const c = document.getElementById('toastContainer');
+  const el = document.createElement('div');
+  el.className = 'toast ' + type;
+  el.innerHTML = (type === 'success'
+    ? '<svg fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7"/></svg>'
+    : '<svg fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>')
+    + '<span>' + escapeHtml(msg) + '</span>';
+  c.appendChild(el);
+  requestAnimationFrame(() => el.classList.add('show'));
+  setTimeout(() => {
+    el.classList.remove('show');
+    setTimeout(() => el.remove(), 350);
+  }, 2400);
+}
+
+// ============ CREATE ============
+function updatePreview() {
+  const url = document.getElementById('inpUrl').value.trim();
+  const slug = document.getElementById('inpSlug').value.trim();
+  const preview = document.getElementById('livePreview');
+  const previewUrl = document.getElementById('previewUrl');
+  const meta = document.getElementById('previewMeta');
+  const expiry = parseInt(document.getElementById('inpExpiry').value);
+
+  if (!url && !slug) { preview.style.display = 'none'; return; }
+  preview.style.display = 'flex';
+  previewUrl.textContent = 'gea.my.id/' + (slug || 'xxxxxx');
+  const parts = [];
+  if (url && isValidUrl(url)) parts.push('✓ URL valid');
+  else if (url) parts.push('✗ URL tidak valid');
+  if (expiry > 0) parts.push(`⏳ ${expiry} hari`);
+  else parts.push('♾️ permanen');
+  meta.textContent = parts.join(' · ');
+}
+
+function createLink() {
+  const url = document.getElementById('inpUrl').value.trim();
+  let slug = document.getElementById('inpSlug').value.trim();
+  const expiryDays = parseInt(document.getElementById('inpExpiry').value);
+  const pass = document.getElementById('inpPass').value.trim();
+  const note = document.getElementById('inpNote').value.trim();
+
+  if (!url || !isValidUrl(url)) return toast('URL tidak valid', 'error');
+  if (slug && !/^[a-zA-Z0-9_-]+$/.test(slug)) return toast('Alias hanya boleh huruf, angka, - dan _', 'error');
+  if (slug && links.some(l => l.slug === slug)) return toast('Alias sudah dipakai', 'error');
+
+  if (!slug) {
+    do { slug = genSlug(); } while (links.some(l => l.slug === slug));
+  }
+
+  const now = Date.now();
+  const expiresAt = expiryDays > 0 ? now + expiryDays * 86400000 : null;
+
+  links.unshift({
+    id: crypto.randomUUID(),
+    slug, url, note,
+    password: pass || null,
+    createdAt: now,
+    expiresAt,
+    clicks: 0,
+    lastClick: null,
+    active: true,
+    clicksHistory: Array(7).fill(0),
+  });
+  save();
+  clearForm();
+  render();
+  toast('Link berhasil dibuat: gea.my.id/' + slug);
+}
+
+function clearForm() {
+  ['inpUrl','inpSlug','inpPass','inpNote'].forEach(id => document.getElementById(id).value = '');
+  document.getElementById('inpExpiry').value = '0';
+  document.getElementById('livePreview').style.display = 'none';
+}
+
+// ============ CRUD ============
+function deleteLink(id) {
+  if (!confirm('Hapus link ini?')) return;
+  links = links.filter(l => l.id !== id);
+  save();
+  if (currentDrawerId === id) closeDrawer();
+  render();
+  toast('Link dihapus');
+}
+function toggleActive(id) {
+  const l = links.find(x => x.id === id);
+  if (l) {
+    l.active = !l.active;
+    save();
+    render();
+    if (currentDrawerId === id) openDrawer(id);
+    toast(l.active ? 'Link diaktifkan' : 'Link dinonaktifkan');
+  }
+}
+function simulateClick(id) {
+  const l = links.find(x => x.id === id);
+  if (!l) return;
+  if (!l.active) return toast('Link nonaktif', 'error');
+  if (l.expiresAt && Date.now() > l.expiresAt) return toast('Link expired', 'error');
+  l.clicks++;
+  l.lastClick = Date.now();
+  if (!l.clicksHistory) l.clicksHistory = Array(7).fill(0);
+  l.clicksHistory[6]++;
+  save();
+  render();
+  if (currentDrawerId === id) openDrawer(id);
+  toast('Klik tercatat +1');
+}
+
+// ============ FILTER / SORT ============
+function setFilter(f) {
+  filter = f;
+  document.querySelectorAll('.filter-btn').forEach(b => b.classList.toggle('active', b.dataset.filter === f));
+  render();
+}
+function setSort(key) {
+  if (sortKey === key) sortDir = sortDir === 'asc' ? 'desc' : 'asc';
+  else { sortKey = key; sortDir = 'desc'; }
+  render();
+}
+
+// ============ RENDER ============
+function getStatus(l) {
+  const now = Date.now();
+  if (!l.active) return { label: 'Nonaktif', cls: 'chip-danger', order: 0 };
+  if (l.expiresAt && l.expiresAt < now) return { label: 'Expired', cls: 'chip-danger', order: 1 };
+  if (l.password) return { label: 'Aktif', cls: 'chip-success', order: 2 };
+  return { label: 'Aktif', cls: 'chip-success', order: 3 };
+}
+
+function render() {
+  const now = Date.now();
+  const query = document.getElementById('searchInput').value.toLowerCase().trim();
+
+  // Stats
+  const active = links.filter(l => l.active && (!l.expiresAt || l.expiresAt > now));
+  document.getElementById('statTotal').textContent = links.length.toLocaleString();
+  const totalClicks = links.reduce((a, l) => a + l.clicks, 0);
+  document.getElementById('statClicks').textContent = totalClicks.toLocaleString();
+  document.getElementById('statActive').textContent = active.length;
+  document.getElementById('statAvg').textContent = links.length ? Math.round(totalClicks / links.length).toLocaleString() : 0;
+  document.getElementById('navCount').textContent = links.length;
+
+  // Filter
+  let filtered = links.filter(l => {
+    if (query) {
+      const hay = (l.slug + ' ' + l.url + ' ' + (l.note || '')).toLowerCase();
+      if (!hay.includes(query)) return false;
+    }
+    if (filter === 'active') return l.active && (!l.expiresAt || l.expiresAt > now);
+    if (filter === 'expired') return l.expiresAt && l.expiresAt < now;
+    if (filter === 'protected') return !!l.password;
+    return true;
+  });
+
+  // Sort
+  filtered.sort((a, b) => {
+    let va, vb;
+    if (sortKey === 'status') { va = getStatus(a).order; vb = getStatus(b).order; }
+    else if (sortKey === 'clicks') { va = a.clicks; vb = b.clicks; }
+    else if (sortKey === 'createdAt') { va = a.createdAt; vb = b.createdAt; }
+    else { va = String(a[sortKey] || ''); vb = String(b[sortKey] || ''); }
+    if (va < vb) return sortDir === 'asc' ? -1 : 1;
+    if (va > vb) return sortDir === 'asc' ? 1 : -1;
+    return 0;
+  });
+
+  // Update sort icons
+  document.querySelectorAll('thead th').forEach((th, i) => {
+    const keys = ['slug','url','status','clicks','createdAt'];
+    th.classList.toggle('sorted', keys[i] === sortKey);
+    const icon = th.querySelector('.sort-icon');
+    if (icon) icon.textContent = keys[i] === sortKey ? (sortDir === 'asc' ? '▲' : '▼') : '▼';
+  });
+
+  // Table
+  const tbody = document.getElementById('linkTable');
+  tbody.innerHTML = '';
+  document.getElementById('emptyState').style.display = filtered.length ? 'none' : 'block';
+
+  filtered.forEach(l => {
+    const st = getStatus(l);
+    const tr = document.createElement('tr');
+    tr.onclick = (e) => {
+      if (e.target.closest('button')) return;
+      openDrawer(l.id);
+    };
+    tr.innerHTML = `
+      <td>
+        <div class="link-cell">
+          <span class="link-slug">/${escapeHtml(l.slug)}</span>
+          ${l.note ? `<span class="link-note">${escapeHtml(l.note)}</span>` : ''}
+        </div>
+      </td>
+      <td><span class="link-target" title="${escapeHtml(l.url)}">${escapeHtml(l.url)}</span></td>
+      <td><span class="chip ${st.cls}">${st.label}</span></td>
+      <td>
+        <div class="clicks-cell">
+          <span class="clicks-num">${l.clicks.toLocaleString()}</span>
+          ${sparkline(l.clicksHistory || Array(7).fill(0))}
+        </div>
+      </td>
+      <td style="color:var(--text-secondary); font-size:12px; white-space:nowrap;">${fmtDate(l.createdAt)}</td>
+      <td>
+        <div class="row-actions">
+          <button class="icon-btn" style="width:32px;height:32px;" title="Simulasi klik" onclick="simulateClick('${l.id}')">
+            <svg fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M15 15l-2 5L9 9l11 4-5 2zm0 0l5 5"/></svg>
+          </button>
+          <button class="icon-btn" style="width:32px;height:32px;" title="QR Code" onclick="openDrawer('${l.id}')">
+            <svg fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M12 4v1m6 11h2m-6 0h-2v4m0-11v3m0 0h.01M12 12h4.01M16 20h4M4 12h4m12 0h.01M5 8h2a1 1 0 001-1V5a1 1 0 00-1-1H5a1 1 0 00-1 1v2a1 1 0 001 1zm14 0h2a1 1 0 001-1V5a1 1 0 00-1-1h-2a1 1 0 00-1 1v2a1 1 0 001 1zM5 20h2a1 1 0 001-1v-2a1 1 0 00-1-1H5a1 1 0 00-1 1v2a1 1 0 001 1z"/></svg>
+          </button>
+          <button class="icon-btn" style="width:32px;height:32px;" title="${l.active ? 'Pause' : 'Aktifkan'}" onclick="toggleActive('${l.id}')">
+            ${l.active
+              ? '<svg fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M10 9v6m4-6v6m7-3a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>'
+              : '<svg fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z"/><path stroke-linecap="round" stroke-linejoin="round" d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>'}
+          </button>
+        </div>
+      </td>
+    `;
+    tbody.appendChild(tr);
+  });
+}
+
+function sparkline(data) {
+  const max = Math.max(1, ...data);
+  const w = 60, h = 20, step = w / Math.max(1, data.length - 1);
+  const pts = data.map((v, i) => `${i * step},${h - (v / max) * (h - 4) - 2}`).join(' ');
+  return `<svg class="sparkline" viewBox="0 0 ${w} ${h}" preserveAspectRatio="none">
+    <polyline fill="none" stroke="var(--primary)" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" points="${pts}"/>
+  </svg>`;
+}
+
+// ============ DRAWER ============
+function openDrawer(id) {
+  const l = links.find(x => x.id === id);
+  if (!l) return;
+  currentDrawerId = id;
+  const st = getStatus(l);
+  const body = document.getElementById('drawerBody');
+  body.innerHTML = `
+    <div class="detail-group">
+      <div class="detail-label">Short URL</div>
+      <div class="detail-value" style="display:flex;align-items:center;justify-content:space-between;gap:8px;">
+        <span>gea.my.id/${escapeHtml(l.slug)}</span>
+        <button class="icon-btn" style="width:28px;height:28px;" title="Copy" onclick="copyToClipboard('https://gea.my.id/${escapeHtml(l.slug)}')">
+          <svg fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"/></svg>
+        </button>
+      </div>
+    </div>
+
+    <div class="detail-group">
+      <div class="detail-label">URL Tujuan</div>
+      <div class="detail-value">${escapeHtml(l.url)}</div>
+    </div>
+
+    <div class="detail-group">
+      <div class="detail-label">Status</div>
+      <div><span class="chip ${st.cls}">${st.label}</span> ${l.password ? '<span class="chip chip-warning" style="margin-left:6px;">🔒 Protected</span>' : ''}</div>
+    </div>
+
+    <div class="detail-group">
+      <div class="detail-label">Statistik</div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">
+        <div class="stat-card" style="padding:12px;">
+          <div class="stat-label">Total Klik</div>
+          <div class="stat-value" style="font-size:20px;">${l.clicks.toLocaleString()}</div>
+        </div>
+        <div class="stat-card" style="padding:12px;">
+          <div class="stat-label">Dibuat</div>
+          <div style="font-size:13px;font-weight:600;margin-top:4px;">${fmtDate(l.createdAt)}</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="detail-group">
+      <div class="detail-label">Tren 7 Hari</div>
+      <div class="stat-card" style="padding:12px;">
+        ${miniChart(l.clicksHistory || Array(7).fill(0))}
+      </div>
+    </div>
+
+    <div class="detail-group">
+      <div class="detail-label">QR Code</div>
+      <div class="qr-container">
+        <div id="qrcode"></div>
+        <span class="muted" style="font-size:11px;color:var(--text-tertiary);">Scan untuk membuka link</span>
+      </div>
+    </div>
+
+    ${l.note ? `<div class="detail-group"><div class="detail-label">Catatan</div><div class="detail-value plain">${escapeHtml(l.note)}</div></div>` : ''}
+
+    <div style="display:flex;gap:8px;margin-top:8px;">
+      <button class="btn btn-secondary" style="flex:1;" onclick="simulateClick('${l.id}')">Simulasi Klik</button>
+      <button class="btn btn-danger-ghost" style="flex:1;" onclick="deleteLink('${l.id}')">Hapus</button>
+    </div>
+  `;
+  // QR
+  setTimeout(() => {
+    const box = document.getElementById('qrcode');
+    if (!box) return;
+    box.innerHTML = '';
+    new QRCode(box, { text: 'https://gea.my.id/' + l.slug, width: 160, height: 160 });
+  }, 50);
+
+  document.getElementById('drawer').classList.add('show');
+  document.getElementById('drawerOverlay').classList.add('show');
+}
+function closeDrawer() {
+  currentDrawerId = null;
+  document.getElementById('drawer').classList.remove('show');
+  document.getElementById('drawerOverlay').classList.remove('show');
+}
+
+function miniChart(data) {
+  const w = 100, h = 100, pad = 4;
+  const max = Math.max(1, ...data);
+  const barW = (w - pad * 2) / data.length;
+  let bars = '';
+  data.forEach((v, i) => {
+    const bh = (v / max) * (h - pad * 2 - 10);
+    const x = pad + i * barW + 2;
+    const y = h - pad - bh;
+    bars += `<rect x="${x}" y="${y}" width="${barW - 4}" height="${bh}" rx="2" fill="var(--primary)" opacity="${0.4 + (v/max)*0.6}"/>`;
+  });
+  return `<svg viewBox="0 0 ${w} ${h}" style="width:100%;height:100px;" preserveAspectRatio="none">${bars}</svg>`;
+}
+
+function copyToClipboard(text) {
+  navigator.clipboard.writeText(text).then(() => toast('Link disalin')).catch(() => toast('Gagal menyalin', 'error'));
+}
+
+// ============ DEMO ============
+function seedDemo() {
+  const now = Date.now();
+  const demos = [
+    { slug: 'promo-akhir-tahun', url: 'https://tokosaya.com/promo/desember-2025?utm=ig', note: 'Kampanye Instagram', clicks: 1284, createdAt: now - 86400000*12, hist: [12,34,28,56,42,89,120] },
+    { slug: 'docs-api', url: 'https://github.com/username/proyek/blob/main/API.md', note: null, clicks: 342, createdAt: now - 86400000*5, hist: [3,8,12,5,9,14,21] },
+    { slug: 'undangan', url: 'https://forms.gle/abc123xyz', note: 'Undangan event', clicks: 89, createdAt: now - 86400000*2, password: 'rahasia', hist: [0,0,5,12,18,22,32] },
+    { slug: 'laporan-q4', url: 'https://drive.google.com/file/d/xyz/view', note: 'Internal', clicks: 12, createdAt: now - 86400000, expiresAt: now + 86400000*6, hist: [0,0,0,2,3,4,3] },
+    { slug: 'lama', url: 'https://contoh.com/lama', note: null, clicks: 45, createdAt: now - 86400000*40, expiresAt: now - 86400000, active: false, hist: [5,8,4,6,2,1,0] },
+  ];
+  demos.forEach(d => {
+    if (!links.some(l => l.slug === d.slug)) {
+      links.push({
+        id: crypto.randomUUID(), slug: d.slug, url: d.url, note: d.note || '',
+        password: d.password || null, createdAt: d.createdAt,
+        expiresAt: d.expiresAt || null, clicks: d.clicks,
+        lastClick: null, active: d.active !== false,
+        clicksHistory: d.hist || Array(7).fill(0),
+      });
+    }
+  });
+  save(); render(); toast('Data demo dimuat');
+}
+
+// ============ MOBILE ============
+function toggleSidebar() {
+  document.getElementById('sidebar').classList.toggle('open');
+}
+
+// ============ INIT ============
+document.getElementById('inpExpiry').addEventListener('change', updatePreview);
+render();
+</script>
+</body>
+</html>
