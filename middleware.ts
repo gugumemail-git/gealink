@@ -12,14 +12,7 @@ export async function middleware(request: NextRequest) {
   if (!success) {
     return NextResponse.json(
       { error: 'Terlalu banyak permintaan. Coba lagi nanti.' },
-      {
-        status: 429,
-        headers: {
-          'Retry-After': String(Math.ceil((reset - Date.now()) / 1000)),
-          'X-RateLimit-Limit': String(limit),
-          'X-RateLimit-Remaining': '0',
-        },
-      }
+      { status: 429, headers: { 'Retry-After': String(Math.ceil((reset - Date.now()) / 1000)) } }
     )
   }
 

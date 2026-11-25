@@ -3,6 +3,6 @@ import { Redis } from '@upstash/redis'
 
 export const ratelimit = new Ratelimit({
   redis: Redis.fromEnv(),
-  limiter: Ratelimit.slidingWindow(10, '60 s'), // 10 request per 60 detik
+  limiter: Ratelimit.slidingWindow(10, '60 s'), // Maksimal 10 request per 1 menit per IP
   analytics: true,
 })
