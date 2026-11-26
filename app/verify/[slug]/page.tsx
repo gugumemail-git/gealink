@@ -1,42 +1,157 @@
-'use client'
-import { useState } from 'react'
-import { useParams, useRouter } from 'next/navigation'
+import { redirect } from 'next/navigation'
+import { createClient } from '@supabase/supabase-js'
+import bcrypt from 'bcryptjs'
 
-export default function VerifyPage() {
-  const params = useParams()
-  const router = useRouter()
-  const [password, setPassword] = useState('')
-  const [error, setError] = useState<string | null>(null)
+const supabaseAdmin = createClient(
+  process.env.NEXT_PUBLIC_SUPABASE_URL!,
+  process.env.SUPABASE_SERVICE_ROLE_KEY!
+)
 
-  async function submit(e: React.FormEvent) {
-    e.preventDefault()
-    const res = await fetch(`/api/verify/${params.slug}`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ password }),
+export default async function VerifyPage({
+  params,
+  searchParams,
+}: {
+  params: Promise<{ slug: string }>
+  searchParams: Promise<{ error?: string }>
+}) {
+  const { slug } = await params
+  const { error } = await searchParams
+
+  async function verifyPassword(formData: FormData) {
+    'use server'
+
+    const inputPassword = String(formData.get('password') || '')
+
+    const { data: link } = await supabaseAdmin
+      .from('links')
+      .select('id, url, active, expires_at, password')
+      .eq('slug', slug)
+      .single()
+
+    if (!link || !link.active) {
+      redirect(`/verify/${slug}?error=notfound`)
+    }
+
+    if (link.expires_at && new Date(link.expires_at).getTime() < Date.now()) {
+      redirect(`/verify/${slug}?error=expired`)
+    }
+
+    if (!link.password) {
+      redirect(link.url)
+    }
+
+    const isValid = await bcrypt.compare(inputPassword, link.password)
+    if (!isValid) {
+      redirect(`/verify/${slug}?error=invalid`)
+    }
+
+    await supabaseAdmin.from('clicks').insert({
+      link_id: link.id,
     })
-    const json = await res.json()
-    if (!res.ok) return setError(json.error || 'Password salah')
-    window.location.href = json.destination_url
+
+    redirect(link.url)
   }
 
   return (
-    <div className="min-h-screen flex items-center justify-center p-4">
-      <form onSubmit={submit} className="card max-w-sm w-full">
-        <div className="card-body">
-          <h1 className="card-title mb-4">Link Terlindungi</h1>
-          <p className="page-sub mb-4">Masukkan password untuk melanjutkan.</p>
-          <input
-            type="password" required
-            value={password}
-            onChange={e => setPassword(e.target.value)}
-            placeholder="Password"
-            className="w-full mb-3"
-          />
-          {error && <p style={{ color: 'var(--danger)', fontSize: 13 }}>{error}</p>}
-          <button type="submit" className="btn btn-primary w-full">Buka Link</button>
+    <div
+      style={{
+        minHeight: '100vh',
+        display: 'grid',
+        placeItems: 'center',
+        padding: '16px',
+      }}
+    >
+      <div className="card" style={{ width: '100%', maxWidth: '400px' }}>
+        <div className="card-header">
+          <span className="card-title">Link Terproteksi</span>
+          <span className="chip chip-warning">Password</span>
         </div>
-      </form>
+
+        <form action={verifyPassword} className="card-body">
+          <p
+            style={{
+              color: 'var(--text-secondary)',
+              fontSize: '13px',
+              marginBottom: '16px',
+            }}
+          >
+            Masukkan password untuk membuka tujuan dari{' '}
+            <strong style={{ color: 'var(--primary)' }}>
+              gea.my.id/{slug}
+            </strong>
+          </p>
+
+          {error === 'invalid' && (
+            <div
+              style={{
+                background: 'var(--danger-soft)',
+                color: 'var(--danger)',
+                padding: '10px 12px',
+                borderRadius: 'var(--radius-sm)',
+                fontSize: '12px',
+                fontWeight: 600,
+                marginBottom: '14px',
+              }}
+            >
+              Password salah. Silakan coba lagi.
+            </div>
+          )}
+
+          {error === 'expired' && (
+            <div
+              style={{
+                background: 'var(--danger-soft)',
+                color: 'var(--danger)',
+                padding: '10px 12px',
+                borderRadius: 'var(--radius-sm)',
+                fontSize: '12px',
+                fontWeight: 600,
+                marginBottom: '14px',
+              }}
+            >
+              Link ini sudah kedaluwarsa.
+            </div>
+          )}
+
+          {error === 'notfound' && (
+            <div
+              style={{
+                background: 'var(--danger-soft)',
+                color: 'var(--danger)',
+                padding: '10px 12px',
+                borderRadius: 'var(--radius-sm)',
+                fontSize: '12px',
+                fontWeight: 600,
+                marginBottom: '14px',
+              }}
+            >
+              Link tidak ditemukan atau sedang nonaktif.
+            </div>
+          )}
+
+          <div className="field">
+            <label htmlFor="password">Password</label>
+            <input
+              id="password"
+              name="password"
+              type="password"
+              required
+              placeholder="Masukkan password..."
+              autoFocus
+            />
+          </div>
+
+          <div className="form-actions">
+            <button
+              type="submit"
+              className="btn btn-primary"
+              style={{ width: '100%' }}
+            >
+              Buka Link
+            </button>
+          </div>
+        </form>
+      </div>
     </div>
   )
 }

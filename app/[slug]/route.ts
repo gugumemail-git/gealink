@@ -1,55 +1,46 @@
-// app/[slug]/route.ts
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
 
-export const runtime = 'edge'
+const supabase = createClient(
+  process.env.NEXT_PUBLIC_SUPABASE_URL!,
+  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+)
 
 export async function GET(
   request: NextRequest,
-  { params }: { params: { slug: string } }
+  { params }: { params: Promise<{ slug: string }> }
 ) {
-  const { slug } = params
+  const { slug } = await params
 
-  // Pakai anon key untuk baca (RLS sudah izinkan SELECT)
-  const supabase = createClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-  )
-
-  const { data: link } = await supabase
+  const { data: link, error } = await supabase
     .from('links')
-    .select('id, destination_url, is_active, expires_at, password_hash')
+    .select('id, url, active, expires_at, password')
     .eq('slug', slug)
     .single()
 
-  // 404: slug tidak ada
-  if (!link) return new NextResponse('Not Found', { status: 404 })
+  if (error || !link || !link.active) {
+    return NextResponse.json(
+      { error: 'Link tidak ditemukan atau sedang nonaktif.' },
+      { status: 404 }
+    )
+  }
 
-  // 410: link nonaktif atau expired
-  if (!link.is_active) return new NextResponse('Link disabled', { status: 410 })
-  if (link.expires_at && new Date(link.expires_at) < new Date())
-    return new NextResponse('Link expired', { status: 410 })
+  if (link.expires_at && new Date(link.expires_at).getTime() < Date.now()) {
+    return NextResponse.json(
+      { error: 'Link ini sudah kedaluwarsa (expired).' },
+      { status: 410 }
+    )
+  }
 
-  // Jika ada password, redirect ke halaman verify dulu
-  if (link.password_hash) {
+  // Jika link diproteksi password, arahkan ke halaman verifikasi
+  if (link.password) {
     return NextResponse.redirect(new URL(`/verify/${slug}`, request.url))
   }
 
-  // Fire-and-forget: catat klik tanpa menunggu (redirect tetap cepat)
-  const country = request.headers.get('x-vercel-ip-country') || 'XX'
-  const ua = request.headers.get('user-agent') || ''
-  const device = /mobile/i.test(ua) ? 'mobile' : /tablet|ipad/i.test(ua) ? 'tablet' : 'desktop'
-
-  supabase.from('clicks').insert({
+  // Catat klik (fire-and-forget)
+  void supabase.from('clicks').insert({
     link_id: link.id,
-    country,
-    device_type: device,
-    referrer: request.headers.get('referer')?.slice(0, 500) || null,
-  }).then(() => {}) // sengaja tidak di-await
-
-  // Redirect 302 (temporary, aman untuk link yang bisa diubah)
-  return NextResponse.redirect(link.destination_url, {
-    status: 302,
-    headers: { 'Cache-Control': 'no-store' },
   })
+
+  return NextResponse.redirect(link.url, 302)
 }
