@@ -23,6 +23,10 @@ interface LinkItem {
 
 const fetcher = async (url: string) => {
   const res = await fetch(url)
+  if (res.status === 401) {
+    window.location.href = '/login'
+    throw new Error('Sesi berakhir, silakan login kembali')
+  }
   if (!res.ok) throw new Error('Gagal memuat data')
   return res.json()
 }
@@ -200,6 +204,11 @@ export default function Dashboard() {
     setNoteInput('')
   }
 
+  async function handleLogout() {
+    await fetch('/api/auth/logout', { method: 'POST' })
+    window.location.href = '/login'
+  }
+
   async function handleCreate(e: React.FormEvent) {
     e.preventDefault()
     const cleanUrl = urlInput.trim()
@@ -230,6 +239,11 @@ export default function Dashboard() {
         }),
       })
 
+      if (res.status === 401) {
+        window.location.href = '/login'
+        return
+      }
+
       const result = await res.json()
       if (!res.ok) {
         throw new Error(result.error || 'Gagal membuat link')
@@ -254,6 +268,10 @@ export default function Dashboard() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ active: nextActive }),
       })
+      if (res.status === 401) {
+        window.location.href = '/login'
+        return
+      }
       if (!res.ok) throw new Error('Gagal mengubah status link')
       await mutate()
       showToast(nextActive ? 'Link diaktifkan' : 'Link dinonaktifkan')
@@ -266,6 +284,10 @@ export default function Dashboard() {
     if (!confirm('Hapus link ini secara permanen?')) return
     try {
       const res = await fetch(`/api/links/${id}`, { method: 'DELETE' })
+      if (res.status === 401) {
+        window.location.href = '/login'
+        return
+      }
       if (!res.ok) throw new Error('Gagal menghapus link')
       if (selectedId === id) setSelectedId(null)
       await mutate()
@@ -392,6 +414,15 @@ export default function Dashboard() {
             <div className="plan-title">Gealink Pro</div>
             <div className="plan-desc">Custom domain aktif • gea.my.id</div>
           </div>
+
+          <button
+            type="button"
+            className="btn btn-danger-ghost"
+            style={{ width: '100%', marginTop: '10px', justifyContent: 'center' }}
+            onClick={handleLogout}
+          >
+            Keluar (Logout)
+          </button>
         </div>
       </aside>
 
