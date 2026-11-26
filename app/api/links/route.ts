@@ -3,82 +3,153 @@ import { createClient } from '@supabase/supabase-js'
 import bcrypt from 'bcryptjs'
 
 const supabaseAdmin = createClient(
-  process.env.SUPABASE_URL!,
-  process.env.SUPABASE_SERVICE_ROLE_KEY!,
-  { auth: { persistSession: false } }
+  process.env.NEXT_PUBLIC_SUPABASE_URL!,
+  process.env.SUPABASE_SERVICE_ROLE_KEY!
 )
 
-// GET: list semua link + total klik
-export async function GET() {
-  const { data: links, error } = await supabaseAdmin
-    .from('links')
-    .select('*, clicks(count)')
-    .order('created_at', { ascending: false })
-
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 })
-
-  // Ambil agregasi klik 7 hari terakhir per link
-  const sevenDaysAgo = new Date(Date.now() - 7 * 86400000).toISOString()
-  const { data: daily } = await supabaseAdmin
-    .from('clicks')
-    .select('link_id, clicked_at')
-    .gte('clicked_at', sevenDaysAgo)
-
-  const historyMap: Record<string, number[]> = {}
-  daily?.forEach(c => {
-    const daysAgo = Math.floor((Date.now() - new Date(c.clicked_at).getTime()) / 86400000)
-    const idx = 6 - Math.min(6, daysAgo) // 0 = 6 hari lalu, 6 = hari ini
-    if (!historyMap[c.link_id]) historyMap[c.link_id] = Array(7).fill(0)
-    historyMap[c.link_id][idx]++
-  })
-
-  const enriched = links.map(l => ({
-    ...l,
-    total_clicks: l.clicks?.[0]?.count ?? 0,
-    clicks_last_7_days: historyMap[l.id] || Array(7).fill(0),
-  }))
-
-  return NextResponse.json({ links: enriched })
+function generateSlug(len = 6) {
+  const chars = 'abcdefghijkmnpqrstuvwxyzABCDEFGHJKLMNPQRSTUVWXYZ23456789'
+  let result = ''
+  for (let i = 0; i < len; i++) {
+    result += chars[Math.floor(Math.random() * chars.length)]
+  }
+  return result
 }
 
-// POST: buat link baru
-export async function POST(request: NextRequest) {
-  const body = await request.json()
-  const { destination_url, slug, note, expires_in_days, password } = body
-
-  if (!destination_url || !/^https?:\/\/.+/.test(destination_url)) {
-    return NextResponse.json({ error: 'URL tidak valid' }, { status: 400 })
+function isValidHttpUrl(value: string) {
+  try {
+    const parsed = new URL(value)
+    return parsed.protocol === 'http:' || parsed.protocol === 'https:'
+  } catch {
+    return false
   }
-  if (slug && !/^[a-zA-Z0-9_-]{1,64}$/.test(slug)) {
-    return NextResponse.json({ error: 'Alias hanya huruf, angka, - dan _' }, { status: 400 })
-  }
+}
 
-  let finalSlug = slug?.trim()
-  if (!finalSlug) {
-    const chars = 'abcdefghijkmnpqrstuvwxyz23456789'
-    finalSlug = Array.from(crypto.getRandomValues(new Uint8Array(7)))
-      .map(b => chars[b % chars.length]).join('')
-  }
+export async function GET() {
+  try {
+    const { data: links, error } = await supabaseAdmin
+      .from('links')
+      .select('id, slug, url, note, password, active, created_at, expires_at')
+      .order('created_at', { ascending: false })
 
-  const password_hash = password ? await bcrypt.hash(password, 10) : null
-  const expires_at = expires_in_days
-    ? new Date(Date.now() + expires_in_days * 86400000).toISOString()
-    : null
-
-  const { data, error } = await supabaseAdmin.from('links').insert({
-    slug: finalSlug,
-    destination_url,
-    note: note || '',
-    password_hash,
-    expires_at,
-  }).select().single()
-
-  if (error) {
-    if (error.code === '23505') {
-      return NextResponse.json({ error: 'Alias sudah dipakai' }, { status: 409 })
+    if (error) {
+      return NextResponse.json({ error: error.message }, { status: 500 })
     }
-    return NextResponse.json({ error: error.message }, { status: 500 })
-  }
 
-  return NextResponse.json({ link: data }, { status: 201 })
+    const { data: clicks } = await supabaseAdmin
+      .from('clicks')
+      .select('link_id, created_at')
+
+    const now = Date.now()
+    const dayMs = 86400000
+
+    const formatted = (links || []).map((link) => {
+      const linkClicks = (clicks || []).filter((c) => c.link_id === link.id)
+      const history = Array(7).fill(0)
+
+      linkClicks.forEach((c) => {
+        if (!c.created_at) return
+        const diffDays = Math.floor((now - new Date(c.created_at).getTime()) / dayMs)
+        if (diffDays >= 0 && diffDays < 7) {
+          history[6 - diffDays] += 1
+        }
+      })
+
+      return {
+        id: link.id,
+        slug: link.slug,
+        url: link.url,
+        note: link.note,
+        hasPassword: Boolean(link.password),
+        active: link.active,
+        created_at: link.created_at,
+        expires_at: link.expires_at,
+        clicks: linkClicks.length,
+        clicksHistory: history,
+      }
+    })
+
+    return NextResponse.json({ links: formatted })
+  } catch {
+    return NextResponse.json(
+      { error: 'Gagal mengambil daftar link.' },
+      { status: 500 }
+    )
+  }
+}
+
+export async function POST(request: NextRequest) {
+  try {
+    const body = await request.json()
+    const rawUrl = String(body.url || body.targetUrl || body.target || '').trim()
+
+    if (!rawUrl || !isValidHttpUrl(rawUrl)) {
+      return NextResponse.json(
+        { error: 'URL tujuan tidak valid. Pastikan diawali http:// atau https://' },
+        { status: 400 }
+      )
+    }
+
+    let slug = String(body.slug || '').trim()
+    if (slug) {
+      if (!/^[a-zA-Z0-9_-]+$/.test(slug)) {
+        return NextResponse.json(
+          { error: 'Alias hanya boleh berisi huruf, angka, tanda hubung (-), atau garis bawah (_).' },
+          { status: 400 }
+        )
+      }
+
+      const { data: existing } = await supabaseAdmin
+        .from('links')
+        .select('id')
+        .eq('slug', slug)
+        .maybeSingle()
+
+      if (existing) {
+        return NextResponse.json(
+          { error: 'Alias sudah digunakan, silakan pilih alias lain.' },
+          { status: 409 }
+        )
+      }
+    } else {
+      let isUnique = false
+      while (!isUnique) {
+        slug = generateSlug(6)
+        const { data: existing } = await supabaseAdmin
+          .from('links')
+          .select('id')
+          .eq('slug', slug)
+          .maybeSingle()
+        if (!existing) isUnique = true
+      }
+    }
+
+    const hashedPassword = body.password
+      ? await bcrypt.hash(String(body.password), 10)
+      : null
+
+    const { data: created, error } = await supabaseAdmin
+      .from('links')
+      .insert({
+        slug,
+        url: rawUrl,
+        note: body.note ? String(body.note).trim() : null,
+        password: hashedPassword,
+        expires_at: body.expires_at || null,
+        active: true,
+      })
+      .select('id, slug, url, note, active, created_at, expires_at')
+      .single()
+
+    if (error) {
+      return NextResponse.json({ error: error.message }, { status: 400 })
+    }
+
+    return NextResponse.json(created, { status: 201 })
+  } catch {
+    return NextResponse.json(
+      { error: 'Terjadi kesalahan saat menyimpan link.' },
+      { status: 500 }
+    )
+  }
 }
